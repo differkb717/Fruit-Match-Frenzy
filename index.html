@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>消消樂遊戲</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: "Microsoft JhengHei", sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      background-color: #f0f8ff;
+    }
+
+    h1 {
+      margin: 20px 0 5px;
+    }
+
+    #score {
+      font-size: 18px;
+      margin-bottom: 15px;
+    }
+
+    #timer {
+      font-size: 18px;
+      margin-bottom: 15px;
+    }
+
+    .grid {
+      width: 320px;
+      height: 320px;
+      display: flex;
+      flex-wrap: wrap;
+      border: 3px solid #333;
+      touch-action: none;
+    }
+
+    .grid div {
+      width: 40px;
+      height: 40px;
+      border: 1px solid #ccc;
+      box-sizing: border-box;
+      background-size: cover;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+    }
+  </style>
+</head>
+<body>
+  <h1>消消樂</h1>
+  <div id="score">已成功消除次數：0</div>
+  <div id="timer">剩餘時間：180</div>
+  <div class="grid" id="grid"></div>
+
+  <script>
+    // DOM Elements
+    const grid = document.getElementById("grid");
+    const scoreDisplay = document.getElementById("score");
+    const timerDisplay = document.getElementById("timer");
+
+    // Game settings
+    const width = 8;  // Grid size (8x8)
+    const fruits = ["🍎", "🍌", "🍇", "🍊", "🍓", "🍍"];  // Fruit types
+    const squares = [];  // Grid squares array
+    let draggedId, replacedId;  // Track dragged and replaced square IDs
+    let touchStartX = 0, touchStartY = 0;  // Track touch start positions for mobile
+    let score = 0;  // Game score
+    let timer = 180;  // Timer starting at 180 seconds
+    let timerInterval;  // Timer interval reference
+
+    // Update score display
+    function updateScoreDisplay() {
+      scoreDisplay.textContent = `已成功消除次數：${Math.floor(score)}`;
+    }
+
+    // Update timer display
+    function updateTimer() {
+      timerDisplay.textContent = `剩餘時間：${timer}`;
+      if (timer <= 0) {
+        clearInterval(timerInterval); // Stop the timer when it reaches 0
+        alert("時間到！遊戲結束！"); // Alert the user when time is up
+      }
+    }
+
+    // Generate random fruit, avoiding matching fruits in adjacent squares
+    function getRandomFruitAvoidingMatch(i) {
+      let avoidFruits = new Set();
+      const left = i % width > 0 ? squares[i - 1]?.textContent : null;
+      const right = i % width < width - 1 ? squares[i + 1]?.textContent : null;
+      const up = i >= width ? squares[i - width]?.textContent : null;
+      const down = i + width < width * width ? squares[i + width]?.textContent : null;
+
+      // Add adjacent fruit types to avoid set
+      [left, right, up, down].forEach(fruit => {
+        if (fruit) avoidFruits.add(fruit);
+      });
+
+      // Filter out fruits in the avoid set and randomly pick one
+      let options = fruits.filter(f => !avoidFruits.has(f));
+      if (options.length === 0) options = fruits;
+      return options[Math.floor(Math.random() * options.length)];
+    }
+
+    // Create the game grid
+    function createBoard() {
+      for (let i = 0; i < width * width; i++) {
+        const square = document.createElement("div");
+        square.setAttribute("draggable", true);
+        square.setAttribute("id", i);
+        square.textContent = getRandomFruitAvoidingMatch(i); // Set a random fruit
+        grid.appendChild(square);
+        squares.push(square);
+
+        // Add event listeners for drag and touch actions
+        square.addEventListener("dragstart", dragStart);
+        square.addEventListener("dragover", e => e.preventDefault());
+        square.addEventListener("drop", dragDrop);
+        square.addEventListener("dragend", dragEnd);
+        square.addEventListener("touchstart", handleTouchStart, { passive: true });
+        square.addEventListener("touchend", handleTouchEnd);
+      }
+    }
+
+    // Start dragging a square
+    function dragStart(e) {
+      draggedId = parseInt(e.target.id);
+    }
+
+    // Drop the square in a new position
+    function dragDrop(e) {
+      replacedId = parseInt(e.target.id);
+    }
+
+    // Handle the drag end and check for valid moves
+    function dragEnd() {
+      const validMoves = [
+        draggedId - 1, draggedId + 1,
+        draggedId - width, draggedId + width
+      ];
+      if (validMoves.includes(replacedId)) {
+        let dragged = squares[draggedId].textContent;
+        let replaced = squares[replacedId].textContent;
+
+        squares[draggedId].textContent = replaced;
+        squares[replacedId].textContent = dragged;
+
+        setTimeout(() => {
+          checkMatch();  // Check for matches after the move
+        }, 100);
+      }
+    }
+
+    // Handle touch events for mobile devices
+    function handleTouchStart(e) {
+      draggedId = parseInt(e.target.id);
+      const touch = e.touches[0];
+      touchStartX = touch.clientX;
+      touchStartY = touch.clientY;
+    }
+
+    // Handle touch end to determine the direction of the swipe
+    function handleTouchEnd(e) {
+      const touch = e.changedTouches[0];
+      const dx = touch.clientX - touchStartX;
+      const dy = touch.clientY - touchStartY;
+
+      let direction = "";
+      if (Math.abs(dx) > Math.abs(dy)) {
+        direction = dx > 0 ? "right" : "left";
+      } else {
+        direction = dy > 0 ? "down" : "up";
+      }
+
+      // Calculate replacedId based on swipe direction
+      replacedId = draggedId;
+      switch (direction) {
+        case "right": replacedId += 1; break;
+        case "left": replacedId -= 1; break;
+        case "up": replacedId -= width; break;
+        case "down": replacedId += width; break;
+      }
+
+      // Check for valid moves and handle them
+      if (
+        replacedId >= 0 && replacedId < width * width &&
+        (Math.abs(replacedId - draggedId) === 1 || Math.abs(replacedId - draggedId) === width)
+      ) {
+        const dragged = squares[draggedId].textContent;
+        const replaced = squares[replacedId].textContent;
+        squares[draggedId].textContent = replaced;
+        squares[replacedId].textContent = dragged;
+
+        setTimeout(() => {
+          checkMatch();  // Check for matches after the move
+        }, 100);
+      }
+    }
+
+    // Check for matches of 3 or more fruits in a row or column
+    function checkMatch() {
+      let matches = [];
+
+      // Check for horizontal matches
+      for (let i = 0; i < width * width; i++) {
+        if ((i % width) < width - 2) {
+          let row = [i, i + 1, i + 2];
+          let fruit = squares[i].textContent;
+          if (fruit && row.every(idx => squares[idx].textContent === fruit)) {
+            matches.push(...row);
+          }
+        }
+      }
+
+      // Check for vertical matches
+      for (let i = 0; i < width * (width - 2); i++) {  // Fix this loop condition
+        let col = [i, i + width, i + width * 2];
+        let fruit = squares[i].textContent;
+        if (fruit && col.every(idx => squares[idx].textContent === fruit)) {
+          matches.push(...col);
+        }
+      }
+
+      // If matches are found, clear them and update score
+      if (matches.length > 0) {
+        const uniqueMatches = [...new Set(matches)];
+        uniqueMatches.forEach(idx => squares[idx].textContent = "");
+        score += uniqueMatches.length / 3;
+        updateScoreDisplay();
+        setTimeout(() => {
+          dropAndRefill();  // Refill the grid after matches
+        }, 200);
+      }
+    }
+
+       // Drop fruits down and refill empty spaces
+    function dropAndRefill() {
+      let changed = false;
+
+      // Continuously drop and refill until no changes are made
+      do {
+        changed = false;
+
+        // Make blocks fall down where there are empty spaces
+        for (let col = 0; col < width; col++) {
+          for (let row = width - 2; row >= 0; row--) {
+            let currentIdx = row * width + col;
+            while (
+              currentIdx + width < width * width && // Ensure within bounds
+              squares[currentIdx].textContent !== "" && // If there's a fruit in the current square
+              squares[currentIdx + width].textContent === "" // If the square below is empty
+            ) {
+              // Move the fruit down
+              squares[currentIdx + width].textContent = squares[currentIdx].textContent;
+              squares[currentIdx].textContent = "";
+              currentIdx += width;
+              changed = true;
+            }
+          }
+        }
+
+        // Handle the empty spaces at the top of each column
+        for (let i = 0; i < width; i++) {
+          if (squares[i].textContent === "") {
+            squares[i].textContent = getRandomFruitAvoidingMatch(i);
+            changed = true;
+          }
+        }
+      } while (changed); // Continue checking if any changes were made
+
+      // Recheck for matches after the refill
+      if (changed) {
+        setTimeout(() => {
+          checkMatch();
+        }, 200);
+      }
+    }
+
+    // Start the game and set the timer interval
+    createBoard();
+    updateScoreDisplay();
+    timerInterval = setInterval(() => {
+      timer--;
+      updateTimer();
+    }, 1000);
+  </script>
+</body>
+</html>
