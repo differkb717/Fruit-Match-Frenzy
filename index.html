@@ -72,6 +72,7 @@
     let score = 0;  // Game score
     let timer = 180;  // Timer starting at 180 seconds
     let timerInterval;  // Timer interval reference
+    let gameOver = false; // Control whether the game is over
 
     // Update score display
     function updateScoreDisplay() {
@@ -83,6 +84,7 @@
       timerDisplay.textContent = `剩餘時間：${timer}`;
       if (timer <= 0) {
         clearInterval(timerInterval); // Stop the timer when it reaches 0
+        gameOver = true; // Time's up. Game over.
         alert("時間到！遊戲結束！"); // Alert the user when time is up
       }
     }
@@ -128,16 +130,19 @@
 
     // Start dragging a square
     function dragStart(e) {
+      if (gameOver) return; // Operation not allowed after the game is over.
       draggedId = parseInt(e.target.id);
     }
 
     // Drop the square in a new position
     function dragDrop(e) {
+      if (gameOver) return; // Operation not allowed after the game is over.
       replacedId = parseInt(e.target.id);
     }
 
     // Handle the drag end and check for valid moves
     function dragEnd() {
+      if (gameOver) return; // Operation not allowed after the game is over.
       const validMoves = [
         draggedId - 1, draggedId + 1,
         draggedId - width, draggedId + width
@@ -157,6 +162,7 @@
 
     // Handle touch events for mobile devices
     function handleTouchStart(e) {
+      if (gameOver) return; // Operation not allowed after the game is over.
       draggedId = parseInt(e.target.id);
       const touch = e.touches[0];
       touchStartX = touch.clientX;
@@ -165,6 +171,7 @@
 
     // Handle touch end to determine the direction of the swipe
     function handleTouchEnd(e) {
+      if (gameOver) return; // Operation not allowed after the game is over.
       const touch = e.changedTouches[0];
       const dx = touch.clientX - touchStartX;
       const dy = touch.clientY - touchStartY;
